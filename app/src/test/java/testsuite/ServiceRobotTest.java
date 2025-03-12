@@ -1,64 +1,67 @@
 package testsuite;
+
 import org.junit.Test;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.After;
+import java.util.*;
 import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.util.HashMap;
 import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import static org.junit.Assert.*;
+import java.io.PrintStream;
 
 public class ServiceRobotTest {
 
-    @Test
-    public void testServiceRobotInitialization() {
-        ServiceRobot serviceRobot = new ServiceRobot(50, 100, 2);
-        assertTrue(serviceRobot.getTaskInfo().isEmpty());
+    private ServiceRobot serviceRobot;
+    private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    private final PrintStream originalOut = System.out;
+    private final InputStream originalIn = System.in;
+
+    @Before
+    public void setUp() {
+        serviceRobot = new ServiceRobot(50, 100, 2);
+        System.setOut(new PrintStream(outContent));
+    }
+
+    @After
+    public void tearDown() {
+        System.setOut(originalOut);
+        System.setIn(originalIn);
+        outContent.reset();
     }
 
     @Test
-    public void testDefineTaskValid() {
-        ServiceRobot serviceRobot = new ServiceRobot(50, 100, 2);
-        String input = "Clean windows\n100\n";
-        InputStream in = new ByteArrayInputStream(input.getBytes());
-        System.setIn(in);
+    public void testServiceRobotInitialization() {
+        assertTrue(serviceRobot.getTaskInfo().isEmpty());
+        assertEquals(50, serviceRobot.getBatteryLevel());
+    }
 
-        try {
-            serviceRobot.defineTask(input, 0);
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        HashMap<String, Integer> taskInfo = serviceRobot.getTaskInfo();
-        assertEquals(1, taskInfo.size());
-        assertEquals(100, (int) taskInfo.get("Clean windows"));
+    @Test
+    public void testDefineTaskValidInput() {
+        String input = "Clean windows\n50\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+        serviceRobot.defineTask();
+        assertEquals(Integer.valueOf(50), serviceRobot.getTaskInfo().get("Clean windows"));
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void testDefineTaskInvalid() {
-        ServiceRobot serviceRobot = new ServiceRobot(50, 100, 2);
-        String input = "Clean windows\n150\n"; // 150 is greater than maxLevel
-        InputStream in = new ByteArrayInputStream(input.getBytes());
-        System.setIn(in);
+    public void testDefineTaskInvalidEnergyNegative() {
+        String input = "Clean windows\n-10\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+        serviceRobot.defineTask();
+    }
 
-        try {
-            serviceRobot.defineTask(input, 0);
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+    @Test(expected = IllegalArgumentException.class)
+    public void testDefineTaskInvalidEnergyTooHigh() {
+        String input = "Clean windows\n150\n";
+        System.setIn(new ByteArrayInputStream(input.getBytes()));
+        serviceRobot.defineTask();
     }
 
     @Test
     public void testChargeOverride() {
-        ServiceRobot serviceRobot = new ServiceRobot(50, 100, 2);
-        ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(outContent));
-
+        serviceRobot = new ServiceRobot(10, 100, 1);
         serviceRobot.charge();
-
-        assertEquals("Time to charge is 100 minutes\n", outContent.toString());
+        assertEquals("Time to charge is 90 minutes", outContent.toString().trim());
         assertEquals(100, serviceRobot.getBatteryLevel());
     }
 }
